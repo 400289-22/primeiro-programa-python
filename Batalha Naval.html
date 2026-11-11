@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Batalha Naval</title>
+	<style>
+		:root { color-scheme: dark; --navy:#071b2c; --panel:#102b40; --blue:#19b8ca; --text:#edf7fb; --muted:#a9c2cf; }
+		* { box-sizing:border-box; }
+		body { margin:0; min-height:100vh; padding:32px 16px; font-family:system-ui,-apple-system,Segoe UI,sans-serif; color:var(--text); background:radial-gradient(ellipse at top,#123c55,var(--navy) 68%); }
+		main { max-width:900px; margin:auto; }
+		header { text-align:center; margin-bottom:28px; }
+		h1 { margin:0 0 8px; font-size:clamp(2rem,6vw,3.2rem); letter-spacing:.04em; }
+		header p { margin:0; color:var(--muted); }
+		.panel { padding:22px; background:rgba(16,43,64,.92); border:1px solid #28516a; border-radius:18px; box-shadow:0 18px 50px #0005; }
+		#status { min-height:48px; margin:0 0 18px; text-align:center; font-size:1.08rem; color:#d5edf4; }
+		.boards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:28px; }
+		.board-wrap h2 { margin:0 0 12px; text-align:center; font-size:1.05rem; }
+		.grid { display:grid; grid-template-columns:repeat(8,1fr); gap:5px; }
+		.cell { aspect-ratio:1; min-width:0; border:1px solid #36718b; border-radius:7px; background:#17425a; color:var(--text); font-size:clamp(.8rem,2.4vw,1.25rem); font-weight:700; cursor:pointer; transition:transform .12s,background .15s,border-color .15s; }
+		.cell:hover:not(:disabled) { transform:scale(1.06); border-color:#75e8ef; background:#21617a; }
+		.cell:disabled { cursor:default; opacity:1; }
+		.cell.mine { background:#98562e; border-color:#f6aa61; }
+		.cell.hit { background:#ad3949; border-color:#ff8290; }
+		.cell.miss { background:#183344; color:#88a6b3; border-color:#29485a; }
+		.cell.sunk { background:#713442; }
+		.controls { display:flex; justify-content:center; flex-wrap:wrap; gap:10px; margin-top:22px; }
+		button.action { border:0; border-radius:9px; padding:11px 18px; color:#06212b; background:var(--blue); font:inherit; font-weight:750; cursor:pointer; }
+		button.action:hover { background:#5de0e6; }
+		button.action.secondary { color:var(--text); background:#29485c; }
+		button.action:disabled { opacity:.45; cursor:not-allowed; }
+		.legend { display:flex; justify-content:center; flex-wrap:wrap; gap:16px; margin-top:18px; color:var(--muted); font-size:.88rem; }
+		.legend span { display:flex; align-items:center; gap:6px; }
+		.dot { width:13px; height:13px; border-radius:4px; background:#98562e; }
+		.dot.hit { background:#ad3949; }.dot.miss { background:#183344; border:1px solid #557080; }
+		@media(max-width:600px) { body{padding:22px 10px}.panel{padding:15px}.boards{grid-template-columns:1fr;gap:24px}.grid{gap:4px}.cell{border-radius:5px} }
+	</style>
+</head>
+<body>
+	<main>
+		<header>
+			<h1>⚓ Batalha Naval</h1>
+			<p>Esconda suas bombas e encontre as do computador!</p>
+		</header>
+		<section class="panel" aria-label="Jogo de batalha naval">
+			<p id="status" aria-live="polite">Escolha 5 posições no seu tabuleiro para esconder suas bombas.</p>
+			<div class="boards">
+				<section class="board-wrap">
+					<h2>Seu tabuleiro <span id="mineCount">(0/5 bombas)</span></h2>
+					<div class="grid" id="playerBoard" aria-label="Seu tabuleiro"></div>
+				</section>
+				<section class="board-wrap">
+					<h2>Tabuleiro inimigo</h2>
+					<div class="grid" id="enemyBoard" aria-label="Tabuleiro inimigo"></div>
+				</section>
+			</div>
+			<div class="controls">
+				<button class="action" id="startButton" disabled>Começar batalha</button>
+				<button class="action secondary" id="resetButton">Recomeçar</button>
+			</div>
+			<div class="legend" aria-label="Legenda">
+				<span><i class="dot"></i> Bomba escondida</span><span><i class="dot hit"></i> Acerto</span><span><i class="dot miss"></i> Água</span>
+			</div>
+		</section>
+	</main>
+	<script>
+		(() => {
+			const SIZE = 8, BOMBS = 5;
+			const status = document.getElementById('status');
+			const mineCount = document.getElementById('mineCount');
+			const startButton = document.getElementById('startButton');
+			const playerBoard = document.getElementById('playerBoard');
+			const enemyBoard = document.getElementById('enemyBoard');
+			let playerBombs, enemyBombs, playerShots, enemyShots, phase, busy;
+
+			function newGame() {
+				playerBombs = new Set(); enemyBombs = new Set(); playerShots = new Set(); enemyShots = new Set();
+				phase = 'placing'; busy = false;
+				mineCount.textContent = '(0/5 bombas)';
+				status.textContent = 'Escolha 5 posições no seu tabuleiro para esconder suas bombas.';
+				startButton.disabled = true;
+				render();
+			}
+
+			function render() {
+				playerBoard.replaceChildren(); enemyBoard.replaceChildren();
+				for (let i = 0; i < SIZE * SIZE; i++) {
+					const own = document.createElement('button');
+					own.className = 'cell'; own.type = 'button'; own.setAttribute('aria-label', `Sua posição ${i + 1}`);
+					if (playerBombs.has(i)) { own.classList.add('mine'); own.textContent = '💣'; }
+					if (enemyShots.has(i)) { own.classList.add(playerBombs.has(i) ? 'hit' : 'miss'); own.textContent = playerBombs.has(i) ? '💥' : '•'; }
+					own.disabled = phase !== 'placing';
+					own.addEventListener('click', () => toggleBomb(i));
+					playerBoard.append(own);
+
+					const enemy = document.createElement('button');
+					enemy.className = 'cell'; enemy.type = 'button'; enemy.setAttribute('aria-label', `Atacar posição ${i + 1}`);
+					if (playerShots.has(i)) {
+						const hit = enemyBombs.has(i); enemy.classList.add(hit ? 'hit' : 'miss'); enemy.textContent = hit ? '💥' : '•';
+					}
+					enemy.disabled = phase !== 'battle' || busy || playerShots.has(i);
+					enemy.addEventListener('click', () => attack(i));
+					enemyBoard.append(enemy);
+				}
+			}
+
+			function toggleBomb(i) {
+				if (phase !== 'placing') return;
+				if (playerBombs.has(i)) playerBombs.delete(i);
+				else if (playerBombs.size < BOMBS) playerBombs.add(i);
+				mineCount.textContent = `(${playerBombs.size}/${BOMBS} bombas)`;
+				startButton.disabled = playerBombs.size !== BOMBS;
+				render();
+			}
+
+			function startBattle() {
+				if (playerBombs.size !== BOMBS) return;
+				while (enemyBombs.size < BOMBS) enemyBombs.add(Math.floor(Math.random() * SIZE * SIZE));
+				phase = 'battle';
+				status.textContent = 'Sua vez! Clique em uma posição do tabuleiro inimigo para atacar.';
+				render();
+			}
+
+			function attack(i) {
+				if (phase !== 'battle' || busy || playerShots.has(i)) return;
+				playerShots.add(i);
+				if (playerShots.has(i) && enemyBombs.has(i)) {
+					status.textContent = `Acertou uma bomba! (${countHits(playerShots, enemyBombs)}/${BOMBS})`;
+				} else status.textContent = 'Água! O computador está escolhendo um alvo...';
+				if (countHits(playerShots, enemyBombs) === BOMBS) return finish(true);
+				busy = true; render();
+				window.setTimeout(() => {
+					let target;
+					do { target = Math.floor(Math.random() * SIZE * SIZE); } while (enemyShots.has(target));
+					enemyShots.add(target);
+					const hit = playerBombs.has(target);
+					if (hit) status.textContent = `O computador acertou uma das suas bombas! (${countHits(enemyShots, playerBombs)}/${BOMBS})`;
+					else status.textContent = 'O computador errou! Sua vez: escolha onde atacar.';
+					busy = false;
+					if (countHits(enemyShots, playerBombs) === BOMBS) finish(false);
+					else render();
+				}, 650);
+			}
+
+			function countHits(shots, bombs) { return [...shots].filter(cell => bombs.has(cell)).length; }
+			function finish(won) {
+				phase = 'finished'; busy = false;
+				status.textContent = won ? '🏆 Você venceu! Encontrou todas as bombas inimigas.' : '💥 O computador venceu! Encontrou todas as suas bombas.';
+				render();
+			}
+
+			startButton.addEventListener('click', startBattle);
+			document.getElementById('resetButton').addEventListener('click', newGame);
+			newGame();
+		})();
+	</script>
+</body>
+</html>
