@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -152,4 +153,160 @@
     draw();
   </script>
 </body>
+=======
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pixel Colorido</title>
+  <style>
+    :root { color-scheme: light; --ink: #20232a; --paper: #fffdf8; --accent: #7557d9; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #eeeaf8; color: var(--ink); font-family: system-ui, sans-serif; }
+    main { width: min(100%, 680px); padding: clamp(20px, 5vw, 40px); border: 3px solid var(--ink); border-radius: 24px; background: var(--paper); box-shadow: 8px 8px 0 var(--ink); text-align: center; }
+    h1 { margin: 0 0 6px; font-size: clamp(1.8rem, 5vw, 2.6rem); }
+    .intro { margin: 0 0 24px; color: #555; }
+    .toolbar, .palette, .actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; }
+    .toolbar { margin-bottom: 16px; }
+    button { border: 2px solid var(--ink); border-radius: 12px; padding: 9px 14px; background: white; color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
+    button:hover { transform: translateY(-2px); }
+    button:focus-visible, .swatch:focus-visible, .cell:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    select { border: 2px solid var(--ink); border-radius: 10px; padding: 9px; background: white; font: inherit; }
+    .palette { margin: 16px 0; }
+    .swatch { width: 36px; height: 36px; padding: 0; border: 3px solid var(--ink); border-radius: 50%; cursor: pointer; }
+    .swatch[aria-pressed="true"] { outline: 3px solid var(--accent); outline-offset: 3px; }
+    #board { display: grid; width: min(100%, 400px); aspect-ratio: 1; margin: 20px auto; border: 3px solid var(--ink); background: white; touch-action: manipulation; }
+    .cell { min-width: 0; min-height: 0; border: 1px solid #d6d6d6; background: white; cursor: crosshair; }
+    .cell.target { background: #222; }
+    .cell.target.colored { background: var(--paint); }
+    .status { min-height: 1.5em; margin: 12px 0; font-weight: 700; }
+    .actions { margin-top: 16px; }
+    #new-picture { background: var(--accent); color: white; }
+    @media (max-width: 420px) { body { padding: 12px; } main { padding: 20px 14px; } .swatch { width: 32px; height: 32px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Pixel Colorido 🎨</h1>
+    <p class="intro">Escolha uma cor e pinte os pixels da figura!</p>
+    <div class="toolbar">
+      <label for="picture">Desenho:</label>
+      <select id="picture" aria-label="Escolha um desenho">
+        <option value="heart">Coração</option>
+        <option value="cat">Gatinho</option>
+        <option value="flower">Flor</option>
+        <option value="star">Estrela</option>
+        <option value="house">Casa</option>
+        <option value="tree">Árvore</option>
+        <option value="smile">Carinha feliz</option>
+      </select>
+      <label for="size">Tamanho:</label>
+      <select id="size" aria-label="Tamanho da grade">
+        <option value="12">12 × 12</option>
+        <option value="16" selected>16 × 16</option>
+        <option value="20">20 × 20</option>
+      </select>
+    </div>
+    <div class="palette" role="group" aria-label="Paleta de cores">
+      <button class="swatch" type="button" style="background:#ef476f" data-color="#ef476f" aria-label="Rosa" aria-pressed="true"></button>
+      <button class="swatch" type="button" style="background:#ffd166" data-color="#ffd166" aria-label="Amarelo" aria-pressed="false"></button>
+      <button class="swatch" type="button" style="background:#06d6a0" data-color="#06d6a0" aria-label="Verde" aria-pressed="false"></button>
+      <button class="swatch" type="button" style="background:#118ab2" data-color="#118ab2" aria-label="Azul" aria-pressed="false"></button>
+      <button class="swatch" type="button" style="background:#8b5cf6" data-color="#8b5cf6" aria-label="Roxo" aria-pressed="false"></button>
+      <button class="swatch" type="button" style="background:#20232a" data-color="#20232a" aria-label="Preto" aria-pressed="false"></button>
+    </div>
+    <div id="board" role="grid" aria-label="Desenho pixelado para colorir"></div>
+    <p class="status" id="status" aria-live="polite">0% colorido — toque nos pixels pretos.</p>
+    <div class="actions">
+      <button type="button" id="erase">Borracha</button>
+      <button type="button" id="clear">Limpar pintura</button>
+      <button type="button" id="new-picture">Novo desenho</button>
+    </div>
+  </main>
+  <script>
+    const art = {
+      heart: ["00110001100","01111011110","11111111111","11111111111","01111111110","00111111100","00011111000","00001110000","00000100000"],
+      cat: ["10000000001","11000000011","11100000111","11111111111","11011111011","11111111111","11111111111","01110001110","00110001100"],
+      flower: ["00000100000","00001110000","00011111000","00111111100","00011111000","00001110000","00000100000","00011100000","00011100000","00111110000","00011100000"],
+      star: ["00000100000","00000100000","00001110000","00001110000","11111111111","01111111110","00111111100","00110101100","01100100110","11000000011","00000000000"],
+      house: ["00000100000","00001110000","00011111000","00111111100","01111111110","01100000010","01101111010","01101111010","01101111010","01111111110","01111111110"],
+      tree: ["00000100000","00001110000","00011111000","00111111100","01111111110","00011111000","00111111100","01111111110","00000100000","00000100000","00000100000"],
+      smile: ["00011111000","00111111100","01111111110","11111111111","11011011011","11011011011","11111111111","11100000111","01100100110","00111111100","00011111000"]
+    };
+    const board = document.querySelector('#board');
+    const status = document.querySelector('#status');
+    const pictureSelect = document.querySelector('#picture');
+    const sizeSelect = document.querySelector('#size');
+    let color = '#ef476f';
+    let eraseMode = false;
+    let cells = [];
+
+    function draw() {
+      const size = Number(sizeSelect.value);
+      const pattern = art[pictureSelect.value];
+      const sourceHeight = pattern.length;
+      const sourceWidth = pattern[0].length;
+      board.replaceChildren();
+      board.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+      board.style.gridTemplateRows = `repeat(${size}, 1fr)`;
+      cells = [];
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const sx = Math.floor(x * sourceWidth / size);
+          const sy = Math.floor(y * sourceHeight / size);
+          const target = pattern[sy][sx] === '1';
+          const cell = document.createElement('button');
+          cell.type = 'button';
+          cell.className = `cell${target ? ' target' : ''}`;
+          cell.setAttribute('role', 'gridcell');
+          cell.setAttribute('aria-label', target ? 'Pixel para colorir' : 'Pixel vazio');
+          cell.dataset.target = target ? '1' : '0';
+          cell.addEventListener('click', () => paint(cell));
+          board.append(cell);
+          if (target) cells.push(cell);
+        }
+      }
+      updateProgress();
+    }
+
+    function paint(cell) {
+      if (cell.dataset.target !== '1') return;
+      if (eraseMode) {
+        cell.classList.remove('colored');
+        cell.style.removeProperty('--paint');
+      } else {
+        cell.classList.add('colored');
+        cell.style.setProperty('--paint', color);
+      }
+      updateProgress();
+    }
+
+    function updateProgress() {
+      const colored = cells.filter(cell => cell.classList.contains('colored')).length;
+      const percent = cells.length ? Math.round(colored / cells.length * 100) : 0;
+      status.textContent = percent === 100 ? '100% colorido — desenho completo! ✨' : `${percent}% colorido — toque nos pixels pretos.`;
+    }
+
+    document.querySelectorAll('.swatch').forEach(button => button.addEventListener('click', () => {
+      color = button.dataset.color;
+      eraseMode = false;
+      document.querySelectorAll('.swatch').forEach(swatch => swatch.setAttribute('aria-pressed', String(swatch === button)));
+    }));
+    document.querySelector('#erase').addEventListener('click', () => { eraseMode = true; });
+    document.querySelector('#clear').addEventListener('click', () => {
+      cells.forEach(cell => { cell.classList.remove('colored'); cell.style.removeProperty('--paint'); });
+      updateProgress();
+    });
+    document.querySelector('#new-picture').addEventListener('click', () => {
+      const options = [...pictureSelect.options];
+      pictureSelect.selectedIndex = (pictureSelect.selectedIndex + 1) % options.length;
+      draw();
+    });
+    pictureSelect.addEventListener('change', draw);
+    sizeSelect.addEventListener('change', draw);
+    draw();
+  </script>
+</body>
+>>>>>>> 7c45f2f6f9e226d852946f06d0fcd5adab22c3b5
 </html>

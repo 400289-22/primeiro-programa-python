@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -135,3 +136,142 @@
 	</script>
 </body>
 </html>
+=======
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Jogo da Memória</title>
+	<style>
+		* { box-sizing: border-box; }
+		body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 20px; font-family: system-ui, sans-serif; color: #24213b; background: linear-gradient(135deg, #f8d7e8, #dce5ff); }
+		main { width: min(100%, 500px); padding: 26px; text-align: center; background: #ffffffdf; border-radius: 22px; box-shadow: 0 14px 40px #36305b25; }
+		h1 { margin: 0 0 5px; }
+		.intro { margin: 0 0 18px; color: #625e75; }
+		.status { display: flex; justify-content: center; gap: 24px; margin-bottom: 16px; font-weight: 700; }
+		.settings { margin: 0 0 16px; }
+		.settings select { margin-left: 6px; padding: 6px 10px; border: 1px solid #c9c4df; border-radius: 8px; font: inherit; }
+		.board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+		.card { aspect-ratio: 1; border: 0; border-radius: 13px; background: #7065bd; color: white; font-size: clamp(1.7rem, 8vw, 2.5rem); cursor: pointer; transition: transform .18s, background .18s; }
+		.card:hover:not(:disabled) { transform: translateY(-3px); }
+		.card.revealed, .card.matched { background: white; }
+		.card.matched { outline: 3px solid #65c9a5; cursor: default; }
+		#message { min-height: 1.5em; margin: 15px 0 10px; font-weight: 700; }
+		#restart { padding: 10px 20px; border: 0; border-radius: 999px; background: #51469b; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+		#restart:hover { background: #40367f; }
+		@media (max-width: 380px) { main { padding: 20px 14px; } .board { gap: 7px; } }
+	</style>
+</head>
+<body>
+	<main>
+		<h1>Jogo da Memória</h1>
+		<p class="intro">Encontre todos os pares!</p>
+		<div class="status" aria-live="polite">
+			<span>Jogadas: <span id="moves">0</span></span>
+			<span>Pares: <span id="pairs">0</span>/<span id="total-pairs">8</span></span>
+			<span>Pontos: <span id="score">0</span></span>
+		</div>
+		<p class="settings"><label for="card-count">Quantidade de cartas:</label>
+			<select id="card-count">
+				<option value="4">4</option>
+				<option value="8">8</option>
+				<option value="12">12</option>
+				<option value="16" selected>16</option>
+			</select>
+		</p>
+		<div class="board" id="board" aria-label="Cartas do jogo"></div>
+		<p id="message" aria-live="polite"></p>
+		<button id="restart" type="button">Recomeçar</button>
+	</main>
+	<script>
+		const symbols = ['🍓', '🚀', '🐱', '🌈', '⚽', '🍕', '🦋', '🎸'];
+		const board = document.querySelector('#board');
+		const movesDisplay = document.querySelector('#moves');
+		const pairsDisplay = document.querySelector('#pairs');
+		const totalPairsDisplay = document.querySelector('#total-pairs');
+		const scoreDisplay = document.querySelector('#score');
+		const cardCountSelect = document.querySelector('#card-count');
+		const message = document.querySelector('#message');
+		let firstCard = null;
+		let locked = false;
+		let moves = 0;
+		let pairs = 0;
+		let totalPairs = 8;
+		let score = 0;
+
+		function startGame() {
+			totalPairs = Number(cardCountSelect.value) / 2;
+			const gameSymbols = symbols.slice(0, totalPairs);
+			const cards = [...gameSymbols, ...gameSymbols];
+			for (let i = cards.length - 1; i > 0; i--) {
+				const j = Math.floor(Math.random() * (i + 1));
+				[cards[i], cards[j]] = [cards[j], cards[i]];
+			}
+			board.replaceChildren();
+			firstCard = null;
+			locked = false;
+			moves = pairs = 0;
+			score = 0;
+			movesDisplay.textContent = moves;
+			pairsDisplay.textContent = pairs;
+			totalPairsDisplay.textContent = totalPairs;
+			scoreDisplay.textContent = score;
+			message.textContent = '';
+
+			cards.forEach((symbol, index) => {
+				const card = document.createElement('button');
+				card.className = 'card';
+				card.type = 'button';
+				card.textContent = '❔';
+				card.dataset.symbol = symbol;
+				card.setAttribute('aria-label', `Carta ${index + 1}, fechada`);
+				card.addEventListener('click', () => revealCard(card, index));
+				board.append(card);
+			});
+		}
+
+		function revealCard(card, index) {
+			if (locked || card.classList.contains('revealed') || card.classList.contains('matched')) return;
+			card.textContent = card.dataset.symbol;
+			card.classList.add('revealed');
+			card.setAttribute('aria-label', `Carta ${index + 1}: ${card.dataset.symbol}`);
+			if (!firstCard) { firstCard = card; return; }
+
+			moves++;
+			movesDisplay.textContent = moves;
+			score = Math.max(0, pairs * 100 - Math.max(0, moves - pairs) * 10);
+			scoreDisplay.textContent = score;
+			if (firstCard.dataset.symbol === card.dataset.symbol) {
+				firstCard.classList.replace('revealed', 'matched');
+				card.classList.replace('revealed', 'matched');
+				firstCard.disabled = card.disabled = true;
+				firstCard = null;
+				pairs++;
+				pairsDisplay.textContent = pairs;
+				score = Math.max(0, pairs * 100 - Math.max(0, moves - pairs) * 10);
+				scoreDisplay.textContent = score;
+				if (pairs === totalPairs) message.textContent = `Parabéns! Você venceu em ${moves} jogadas, com ${score} pontos!`;
+				return;
+			}
+
+			locked = true;
+			const previous = firstCard;
+			firstCard = null;
+			setTimeout(() => {
+				previous.textContent = card.textContent = '❔';
+				previous.classList.remove('revealed');
+				card.classList.remove('revealed');
+				previous.setAttribute('aria-label', 'Carta fechada');
+				card.setAttribute('aria-label', 'Carta fechada');
+				locked = false;
+			}, 850);
+		}
+
+		document.querySelector('#restart').addEventListener('click', startGame);
+		cardCountSelect.addEventListener('change', startGame);
+		startGame();
+	</script>
+</body>
+</html>
+>>>>>>> 7c45f2f6f9e226d852946f06d0fcd5adab22c3b5
