@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Arco e Flecha ao Ar Livre</title>
+	<style>
+		* { box-sizing: border-box; }
+		body { margin: 0; padding: 24px; min-height: 100vh; display: grid; place-items: center; background: #e8f4dc; color: #233b2b; font: 16px system-ui, sans-serif; }
+		main { width: min(920px, 100%); }
+		h1 { margin: 0 0 14px; text-align: center; color: #315d3b; }
+		.controles { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 16px 24px; padding: 14px; background: #fffdf2; border: 1px solid #c9d8bd; border-radius: 12px 12px 0 0; }
+		button { border: 0; border-radius: 8px; padding: 10px 16px; background: #397748; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+		button:hover { background: #285d35; }
+		button:disabled { opacity: .55; cursor: wait; }
+		#status { min-width: 190px; text-align: center; font-weight: 700; }
+		canvas { display: block; width: 100%; height: auto; border: 1px solid #c9d8bd; border-top: 0; border-radius: 0 0 12px 12px; }
+		.dica { margin: 10px 0; text-align: center; color: #536653; }
+	</style>
+</head>
+<body>
+	<main>
+		<h1>🏹 Arco e Flecha ao Ar Livre</h1>
+		<section class="controles" aria-label="Controles do jogo">
+			<span id="status" aria-live="polite"></span>
+			<button id="reiniciar">Reiniciar</button>
+		</section>
+		<canvas id="campo" width="900" height="470" aria-label="Paisagem com alvos de arco e flecha"></canvas>
+		<p class="dica">Clique e arraste com o botão esquerdo do arco em direção ao alvo; solte para atirar. Quanto mais longe arrastar, maior a força.</p>
+	</main>
+	<script>
+		const canvas = document.querySelector('#campo');
+		const ctx = canvas.getContext('2d');
+		const status = document.querySelector('#status');
+		let level = 1;
+		let score = 0;
+		let targets = [];
+		let arrow = null;
+		let frame = 0;
+		let force = 20;
+		let aimAngle = 25 * Math.PI / 180;
+		let aiming = false;
+
+		function updateStatus(message) {
+			status.textContent = message || `Nível ${level} · ${targets.filter(t => !t.hit).length} alvos · ${score} pontos`;
+		}
+
+		function createTargets() {
+			const count = level + 2;
+			targets = Array.from({ length: count }, (_, i) => ({
+				x: 485 + i * (350 / Math.max(1, count - 1)),
+				y: 272 - (i % 3) * 28,
+				hit: false
+			}));
+			updateStatus();
+		}
+
+		function drawScenery() {
+			const sky = ctx.createLinearGradient(0, 0, 0, 470);
+			sky.addColorStop(0, '#83cbed'); sky.addColorStop(1, '#e8f5cd');
+			ctx.fillStyle = sky; ctx.fillRect(0, 0, 900, 470);
+			ctx.fillStyle = '#fff0a5'; ctx.beginPath(); ctx.arc(760, 72, 36, 0, Math.PI * 2); ctx.fill();
+			ctx.fillStyle = '#91b9a2';
+			ctx.beginPath(); ctx.moveTo(0, 300); ctx.lineTo(140, 125); ctx.lineTo(300, 300); ctx.lineTo(445, 155); ctx.lineTo(610, 300); ctx.lineTo(760, 155); ctx.lineTo(900, 300); ctx.closePath(); ctx.fill();
+			ctx.fillStyle = '#6f9e70';
+			ctx.beginPath(); ctx.moveTo(0, 320); ctx.quadraticCurveTo(250, 260, 440, 325); ctx.quadraticCurveTo(690, 390, 900, 300); ctx.lineTo(900, 470); ctx.lineTo(0, 470); ctx.closePath(); ctx.fill();
+			ctx.fillStyle = '#47784b'; ctx.fillRect(0, 390, 900, 80);
+			[75, 175, 390, 850].forEach((x, i) => {
+				const y = i === 2 ? 300 : 320;
+				ctx.fillStyle = '#79563b'; ctx.fillRect(x - 5, y, 10, 52);
+				ctx.fillStyle = '#2f7045';
+				[[x, y - 11, 24], [x - 15, y + 3, 18], [x + 15, y + 3, 18]].forEach(([cx, cy, r]) => {
+					ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+				});
+			});
+		}
+
+		function drawArcher() {
+			ctx.fillStyle = '#344b37'; ctx.beginPath(); ctx.arc(78, 333, 13, 0, Math.PI * 2); ctx.fill();
+			ctx.strokeStyle = '#344b37'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+			ctx.beginPath(); ctx.moveTo(78, 347); ctx.lineTo(78, 383); ctx.moveTo(78, 357); ctx.lineTo(101, 366); ctx.moveTo(78, 383); ctx.lineTo(65, 404); ctx.moveTo(78, 383); ctx.lineTo(92, 404); ctx.stroke();
+			ctx.save(); ctx.translate(103, 373); ctx.rotate(-aimAngle);
+			ctx.strokeStyle = '#8a5937'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, -29); ctx.quadraticCurveTo(32, 0, 0, 29); ctx.stroke();
+			ctx.strokeStyle = '#eee4c9'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, -29); ctx.lineTo(0, 29); ctx.stroke();
+			ctx.restore();
+		}
+
+		function drawAimLine() {
+			const length = 70 + force * 3;
+			ctx.save(); ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; ctx.lineWidth = 2; ctx.setLineDash([8, 6]);
+			ctx.beginPath(); ctx.moveTo(107, 365); ctx.lineTo(107 + Math.cos(aimAngle) * length, 365 - Math.sin(aimAngle) * length); ctx.stroke();
+			ctx.restore();
+		}
+
+		function drawTarget(target) {
+			ctx.strokeStyle = '#684a32'; ctx.lineWidth = 5;
+			ctx.beginPath(); ctx.moveTo(target.x, target.y + 23); ctx.lineTo(target.x, 390); ctx.stroke();
+			if (target.hit) {
+				ctx.fillStyle = '#9aa58a'; ctx.beginPath(); ctx.arc(target.x, target.y, 23, 0, Math.PI * 2); ctx.fill();
+				ctx.strokeStyle = '#657455'; ctx.lineWidth = 3; ctx.beginPath();
+				ctx.moveTo(target.x - 14, target.y - 14); ctx.lineTo(target.x + 14, target.y + 14);
+				ctx.moveTo(target.x + 14, target.y - 14); ctx.lineTo(target.x - 14, target.y + 14); ctx.stroke();
+			} else {
+				[['#f5f0d7', 23], ['#df5545', 18], ['#f5f0d7', 12], ['#e5bc45', 6], ['#c7443c', 2.5]].forEach(([color, radius]) => {
+					ctx.fillStyle = color; ctx.beginPath(); ctx.arc(target.x, target.y, radius, 0, Math.PI * 2); ctx.fill();
+				});
+			}
+		}
+
+		function drawArrow() {
+			if (!arrow) return;
+			ctx.save(); ctx.translate(arrow.x, arrow.y); ctx.rotate(Math.atan2(arrow.vy, arrow.vx));
+			ctx.strokeStyle = '#4d3827'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-24, 0); ctx.lineTo(10, 0); ctx.stroke();
+			ctx.fillStyle = '#eee4c9'; ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(7, -5); ctx.lineTo(7, 5); ctx.closePath(); ctx.fill();
+			ctx.fillStyle = '#d95544'; ctx.beginPath(); ctx.moveTo(-21, 0); ctx.lineTo(-27, -6); ctx.lineTo(-15, -2); ctx.closePath(); ctx.fill();
+			ctx.restore();
+		}
+
+		function draw() {
+			drawScenery(); drawArcher(); drawAimLine(); targets.forEach(drawTarget); drawArrow();
+		}
+
+		function stopArrow() {
+			arrow = null;
+			if (frame) cancelAnimationFrame(frame);
+			frame = 0; draw();
+		}
+
+		function animateArrow() {
+			if (!arrow) return;
+			arrow.x += arrow.vx; arrow.y += arrow.vy; arrow.vy += 0.16;
+			const hit = targets.find(target => !target.hit && Math.hypot(arrow.x - target.x, arrow.y - target.y) < 25);
+			if (hit) {
+				hit.hit = true; score += 10; stopArrow();
+				if (targets.every(target => target.hit)) {
+					level += 1; createTargets(); updateStatus(`Nível ${level}! Agora são ${targets.length} alvos.`);
+				} else updateStatus();
+				return;
+			}
+			if (arrow.x > 920 || arrow.y > 460 || arrow.y < -30) {
+				stopArrow(); updateStatus('Não acertou. Ajuste a força ou o ângulo e tente novamente!'); return;
+			}
+			draw(); frame = requestAnimationFrame(animateArrow);
+		}
+
+		function atirar() {
+			if (arrow) return;
+			const speed = force * 0.55;
+			arrow = { x: 107, y: 365, vx: speed * Math.cos(aimAngle), vy: -speed * Math.sin(aimAngle) };
+			animateArrow();
+		}
+
+		function atualizarMira(event) {
+			const rect = canvas.getBoundingClientRect();
+			const x = (event.clientX - rect.left) * canvas.width / rect.width;
+			const y = (event.clientY - rect.top) * canvas.height / rect.height;
+			const dx = x - 107;
+			const dy = 365 - y;
+			if (dx > 0) aimAngle = Math.max(0, Math.min(80, Math.atan2(dy, dx)));
+			force = Math.max(10, Math.min(30, 10 + Math.hypot(dx, dy) / 12));
+			draw();
+		}
+		canvas.addEventListener('pointerdown', event => {
+			if (event.button !== 0 || arrow) return;
+			aiming = true;
+			canvas.setPointerCapture(event.pointerId);
+			atualizarMira(event);
+		});
+		canvas.addEventListener('pointermove', event => {
+			if (aiming && !arrow) atualizarMira(event);
+		});
+		canvas.addEventListener('pointerup', event => {
+			if (!aiming || event.button !== 0 || arrow) return;
+			atualizarMira(event);
+			aiming = false;
+			atirar();
+		});
+		canvas.addEventListener('pointercancel', () => { aiming = false; });
+		document.querySelector('#reiniciar').addEventListener('click', () => {
+			if (frame) cancelAnimationFrame(frame);
+			frame = 0; arrow = null; aiming = false; level = 1; score = 0;
+			createTargets(); draw();
+		});
+
+		createTargets(); draw();
+	</script>
+</body>
+</html>
