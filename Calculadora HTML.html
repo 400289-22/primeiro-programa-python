@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calculadora</title>
+  <style>
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      background: #eef2f7;
+      font-family: Arial, sans-serif;
+    }
+    .calculadora {
+      width: 280px;
+      padding: 16px;
+      border-radius: 12px;
+      background: #1f2937;
+      box-shadow: 0 8px 24px #0002;
+    }
+    #visor {
+      box-sizing: border-box;
+      width: 100%;
+      height: 64px;
+      margin-bottom: 12px;
+      padding: 10px;
+      border: 0;
+      border-radius: 6px;
+      background: #f9fafb;
+      color: #111827;
+      font-size: 2rem;
+      text-align: right;
+    }
+    .teclas {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    button {
+      height: 54px;
+      border: 0;
+      border-radius: 6px;
+      background: #374151;
+      color: white;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+    button:hover { filter: brightness(1.2); }
+    .operador { background: #2563eb; }
+    .limpar { background: #dc2626; }
+    .igual { grid-column: span 2; background: #16a34a; }
+  </style>
+</head>
+<body>
+  <main class="calculadora" aria-label="Calculadora">
+    <input id="visor" value="0" aria-label="Visor" readonly>
+    <div class="teclas">
+      <button class="limpar" data-acao="limpar">C</button>
+      <button data-acao="apagar">⌫</button>
+      <button class="operador" data-operador="/">÷</button>
+      <button class="operador" data-operador="*">×</button>
+      <button data-numero="7">7</button><button data-numero="8">8</button><button data-numero="9">9</button>
+      <button class="operador" data-operador="-">−</button>
+      <button data-numero="4">4</button><button data-numero="5">5</button><button data-numero="6">6</button>
+      <button class="operador" data-operador="+">+</button>
+      <button data-numero="1">1</button><button data-numero="2">2</button><button data-numero="3">3</button>
+      <button data-acao="decimal">.</button>
+      <button data-numero="0">0</button><button class="igual" data-acao="calcular">=</button>
+    </div>
+  </main>
+  <script>
+    const visor = document.getElementById('visor');
+    let atual = '0';
+    let anterior = null;
+    let operador = null;
+    let novoNumero = false;
+
+    function mostrar() {
+      visor.value = atual;
+    }
+
+    function calcular() {
+      if (operador === null || anterior === null) return;
+      const a = Number(anterior);
+      const b = Number(atual);
+      let resultado;
+      switch (operador) {
+        case '+': resultado = a + b; break;
+        case '-': resultado = a - b; break;
+        case '*': resultado = a * b; break;
+        case '/': resultado = b === 0 ? NaN : a / b; break;
+      }
+      atual = Number.isFinite(resultado)
+        ? String(Number(resultado.toPrecision(10)))
+        : 'Erro';
+      anterior = null;
+      operador = null;
+      novoNumero = true;
+      mostrar();
+    }
+
+    document.querySelector('.teclas').addEventListener('click', (evento) => {
+      const botao = evento.target.closest('button');
+      if (!botao) return;
+
+      if (botao.dataset.numero !== undefined) {
+        if (novoNumero || atual === '0' || atual === 'Erro') {
+          atual = botao.dataset.numero;
+          novoNumero = false;
+        } else {
+          atual += botao.dataset.numero;
+        }
+        mostrar();
+      } else if (botao.dataset.operador) {
+        if (operador && !novoNumero) calcular();
+        anterior = atual;
+        operador = botao.dataset.operador;
+        novoNumero = true;
+      } else if (botao.dataset.acao === 'calcular') {
+        calcular();
+      } else if (botao.dataset.acao === 'decimal') {
+        if (novoNumero || atual === 'Erro') {
+          atual = '0';
+          novoNumero = false;
+        }
+        if (!atual.includes('.')) atual += '.';
+        mostrar();
+      } else if (botao.dataset.acao === 'apagar') {
+        atual = atual.length > 1 ? atual.slice(0, -1) : '0';
+        mostrar();
+      } else if (botao.dataset.acao === 'limpar') {
+        atual = '0';
+        anterior = null;
+        operador = null;
+        novoNumero = false;
+        mostrar();
+      }
+    });
+  </script>
+</body>
+</html>
