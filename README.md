@@ -1,2 +1,2 @@
 # projeto-programação
-Meu primeiro programa em Python - UC Programação de Aplicativos
+Meu primeiro programa - UC Programação de Aplicativos
